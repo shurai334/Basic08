@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ToDo アプリケーション</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .task-form {
+            margin-bottom: 20px;
+            padding: 20px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        .task-list {
+            list-style: none;
+            padding: 0;
+        }
+        .task-item {
+            padding: 10px;
+            margin: 5px 0;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .task-item.completed {
+            background-color: #e8f5e9;
+        }
+        .task-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+        }
+        .task-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        button {
+            margin-left: 5px;
+            padding: 5px 10px;
+        }
+        .edit-form {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 3px;
+        }
+        .edit-form input, .edit-form textarea {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>ToDo アプリケーション</h1>
+    
+    <div class="task-form">
+        <h2>新規タスク追加</h2>
+        <div>
+            <label for="title">タイトル:</label>
+            <input type="text" id="title" required>
+        </div>
+        <div>
+            <label for="description">説明:</label>
+            <textarea id="description" required></textarea>
+        </div>
+        <button onclick="addTask()">追加</button>
+    </div>
+
+    <h2>タスク一覧</h2>
+    <ul id="taskList" class="task-list"></ul>
+
+    <script>
+
+        async function loadTasks() {
+            const response = await fetch('/api/tasks');
+            const tasks = await response.json();
+            const taskList = document.getElementById('taskList');
+            taskList.innerHTML = '';
+            
+            tasks.forEach(task => {
+                const li = document.createElement('li');
+                li.className = `task-item ${task.completed ? 'completed' : ''}`;
+                li.id = `task-${task.id}`;
+                li.innerHTML = `
+                    <div class="task-content">
+                        <div>
+                            <h3>${task.title}</h3>
+                            <p>${task.description}</p>
+                            <small>作成日時: ${new Date(task.createdAt).toLocaleString()}</small>
+                        </div>
+                        <div class="task-buttons">
+                            <button onclick="toggleTask(${task.id}, ${!task.completed})">${task.completed ? '未完了' : '完了'}</button>
+                            <button onclick="showEditForm(${task.id}, '${task.title}', '${task.description}')">編集</button>
+                            <button onclick="deleteTask(${task.id})">削除</button>
+                        </div>
+                    </div>
+                    <div id="edit-form-${task.id}" style="display: none;" class="edit-form">
+                        <input type="text" id="edit-title-${task.id}" value="${task.title}">
+                        <textarea id="edit-description-${task.id}">${task.description}</textarea>
+                        <button onclick="updateTask(${task.id})">更新</button>
+                        <button onclick="hideEditForm(${task.id})">キャンセル</button>
+                    </div>
+                `;
+                taskList.appendChild(li);
+            });
+        }
+
+        async function addTask() {
+            const title = document.getElementById('title').value;
+            const description = document.getElementById('description').value;
+            
+            if (!title || !description) {
+                alert('タイトルと説明を入力してください');
+                return;
+            }
+
+            await fetch('/api/tasks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ title, description }),
+            });
+            
+            document.getElementById('title').value = '';
+            document.getElementById('description').value = '';
+            loadTasks();
+        }
+
+        function showEditForm(id, title, description) {
+            document.getElementById(`edit-form-${id}`).style.display = 'block';
+        }
+
+        function hideEditForm(id) {
+            document.getElementById(`edit-form-${id}`).style.display = 'none';
+        }
+
+        async function updateTask(id) {
+            const title = document.getElementById(`edit-title-${id}`).value;
+            const description = document.getElementById(`edit-description-${id}`).value;
+            
+            if (!title || !description) {
+                alert('タイトルと説明を入力してください');
+                return;
+            }
+
+            const response = await fetch(`/api/tasks/${id}`);
+            const task = await response.json();
+            task.title = title;
+            task.description = description;
+            
+            await fetch(`/api/tasks/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(task),
+            });
+            
+            hideEditForm(id);
+            loadTasks();
+        }
+
+        async function toggleTask(id, completed) {
+            const response = await fetch(`/api/tasks/${id}`);
+            const task = await response.json();
+            task.completed = completed;
+            
+            await fetch(`/api/tasks/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(task),
+            });
+            
+            loadTasks();
+        }
+
+        async function deleteTask(id) {
+            if (confirm('このタスクを削除してもよろしいですか？')) {
+                await fetch(`/api/tasks/${id}`, {
+                    method: 'DELETE',
+                });
+                loadTasks();
+            }
+        }
+
+        loadTasks();
+    </script>
+</body>
+</html>
